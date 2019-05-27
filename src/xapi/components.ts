@@ -1,7 +1,14 @@
 import XAPI from '.';
-import { Gettable, Listenable, mix, Settable } from './mixins';
+import {
+  Gettable,
+  GettableImpl,
+  Listenable,
+  ListenableImpl,
+  Settable,
+  SettableImpl,
+} from './mixins';
 import normalizePath from './normalizePath';
-import { Listener, Path } from './types';
+import { Path } from './types';
 
 /**
  * Common base class for XAPI section types (commands, configs, events, statuses).
@@ -10,16 +17,13 @@ import { Listener, Path } from './types';
  */
 class Component {
   /**
-   * Prefix to add to all paths for the component.
-   *
-   * @type {string}
-   */
-  public prefix = '';
-
-  /**
    * @param {XAPI} xapi - XAPI instance.
+   * @param {prefix} string - Prefix to add to all paths for the component.
    */
-  constructor(public readonly xapi: XAPI) {}
+  constructor(
+    protected readonly xapi: XAPI,
+    protected readonly prefix: string,
+  ) {}
   /**
    * @type {XAPI}
    */
@@ -27,10 +31,10 @@ class Component {
   /**
    * Normalizes a path including the component prefix.
    *
-   * @param {Array|string} path - Normalize an XAPI path.
-   * @return {Array} - Normalized path.
+   * @param path - Normalize an XAPI path.
+   * @return - Normalized path.
    */
-  public normalizePath(path: Path) {
+  protected normalizePath = (path: Path) => {
     const normalized = normalizePath(path);
     const { prefix } = this;
     return !prefix
@@ -43,26 +47,32 @@ class Component {
  * Interface to XAPI configurations.
  *
  * @extends {Component}
- * @extends {Listenable}
- * @extends {Gettable}
- * @extends {Settable}
+ * @implements {Listenable}
+ * @implements {Gettable}
+ * @implements {Settable}
  */
-export class Config extends mix(Component, Listenable, Gettable, Settable)
-  implements Component, Listenable, Gettable, Settable {
-  public prefix = 'Configuration';
+export class Config extends Component
+  implements Listenable, Gettable, Settable {
 
-  // fake mixins
-  public normalizePath!: (path: Path) => Array<string | number>;
+  public get: Gettable['get'];
+  public set: Settable['set'];
+  public on: Listenable['on'];
+  public once: Listenable['once'];
+  public off: Listenable['off'];
+  private listenable: Listenable;
+  private gettable: Gettable;
+  private settable: Settable;
 
-  public on!: (path: Path, listener: Listener) => () => void;
-  public once!: (path: Path, listener: Listener) => () => void;
-  public off!: () => void;
-
-  public get!: (path: Path) => Promise<any>;
-  public set!: (path: Path, value: number | string) => Promise<any>;
-
-  constructor(public readonly xapi: XAPI) {
-    super();
+  constructor(xapi: XAPI) {
+    super(xapi, 'Configuration');
+    this.listenable = new ListenableImpl(xapi, this.normalizePath);
+    this.gettable = new GettableImpl(xapi, this.normalizePath);
+    this.settable = new SettableImpl(xapi, this.normalizePath);
+    this.get = this.gettable.get;
+    this.set = this.settable.set;
+    this.on = this.listenable.on;
+    this.once = this.listenable.once;
+    this.off = this.listenable.off;
   }
 }
 
@@ -70,21 +80,21 @@ export class Config extends mix(Component, Listenable, Gettable, Settable)
  * Interface to XAPI events.
  *
  * @extends {Component}
- * @extends {Listenable}
+ * @implements {Listenable}
  */
-export class Event extends mix(Component, Listenable)
-  implements Component, Listenable {
-  public prefix = 'Event';
+export class Event extends Component implements Listenable {
 
-  // fake mixins
-  public normalizePath!: (path: Path) => Array<string | number>;
+  public on: Listenable['on'];
+  public once: Listenable['once'];
+  public off: Listenable['off'];
+  private listenable: Listenable;
 
-  public on!: (path: Path, listener: Listener) => () => void;
-  public once!: (path: Path, listener: Listener) => () => void;
-  public off!: () => void;
-
-  constructor(readonly xapi: XAPI) {
-    super();
+  constructor(xapi: XAPI) {
+    super(xapi, 'Event');
+    this.listenable = new ListenableImpl(xapi, this.normalizePath);
+    this.on = this.listenable.on;
+    this.once = this.listenable.once;
+    this.off = this.listenable.off;
   }
 }
 
@@ -92,23 +102,26 @@ export class Event extends mix(Component, Listenable)
  * Interface to XAPI statuses.
  *
  * @extends {Component}
- * @extends {Listenable}
- * @extends {Gettable}
+ * @implements {Listenable}
+ * @implements {Gettable}
  */
-export class Status extends mix(Component, Listenable, Gettable)
-  implements Component, Listenable, Gettable {
-  public prefix = 'Status';
+export class Status extends Component implements Listenable, Gettable {
 
-  // fake mixins
-  public normalizePath!: (path: Path) => Array<string | number>;
+  public get: Gettable['get'];
+  public on: Listenable['on'];
+  public once: Listenable['once'];
+  public off: Listenable['off'];
+  private listenable: Listenable;
+  private gettable: Gettable;
 
-  public on!: (path: Path, listener: Listener) => () => void;
-  public once!: (path: Path, listener: Listener) => () => void;
-  public off!: () => void;
+  constructor(xapi: XAPI) {
+    super(xapi, 'Status');
+    this.listenable = new ListenableImpl(xapi, this.normalizePath);
+    this.gettable = new GettableImpl(xapi, this.normalizePath);
 
-  public get!: (path: Path) => Promise<any>;
-
-  constructor(public readonly xapi: XAPI) {
-    super();
+    this.get = this.gettable.get;
+    this.on = this.listenable.on;
+    this.once = this.listenable.once;
+    this.off = this.listenable.off;
   }
 }
